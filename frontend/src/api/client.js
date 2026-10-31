@@ -1,6 +1,16 @@
 // All communication with the Spring Boot backend lives in this one file.
 
-const API_BASE = (import.meta.env && import.meta.env.VITE_API_URL) || '/api';
+// Render-ல் VITE_API_URL-ல் '/api' விடுபட்டிருந்தாலோ அல்லது கூடுதல் '/' இருந்தாலோ தானாக சரிசெய்யும் logic
+function resolveApiBase() {
+  const envUrl = (import.meta.env && import.meta.env.VITE_API_URL) ? import.meta.env.VITE_API_URL.trim() : '';
+  if (!envUrl) {
+    return '/api';
+  }
+  const cleanUrl = envUrl.replace(/\/+$/, '');
+  return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+}
+
+const API_BASE = resolveApiBase();
 
 const TOKEN_KEY = 'shopeasyToken';
 const USER_KEY = 'shopeasyUser';
@@ -41,7 +51,7 @@ async function request(path, { method = 'GET', body } = {}) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error('Cannot reach the server. Is the Spring Boot backend running on port 8080?');
+    throw new Error('Cannot reach the backend server. Please verify backend is up on Render.');
   }
 
   const data = await response.json().catch(() => ({}));   // 204 / empty bodies
@@ -50,7 +60,7 @@ async function request(path, { method = 'GET', body } = {}) {
       unauthorizedHandler();
     }
     if (response.status === 404 && !data.error) {
-      throw new Error('API route not found - an old backend is probably still running. Stop it and restart from this project (mvn clean spring-boot:run).');
+      throw new Error('API route not found - backend endpoint missing or wrong URL path.');
     }
     throw new Error(data.error || `Request failed (${response.status})`);
   }
