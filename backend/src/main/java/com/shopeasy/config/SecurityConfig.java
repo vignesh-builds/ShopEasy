@@ -29,36 +29,30 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable)          // stateless JWT API, no cookies/sessions
+                .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
-                .cors(cors -> { })                              // uses corsConfigurationSource() below
+                .cors(cors -> { })
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) -> writeError(res, 401, "Authentication required"))
                         .accessDeniedHandler((req, res, ex) -> writeError(res, 403, "Access denied")))
                 .authorizeHttpRequests(auth -> auth
-                        // CORS pre-flight requests from the React app
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/", "/error").permitAll()
-                        // Public read-only API
                         .requestMatchers(HttpMethod.GET, "/api/health", "/api/categories",
                                 "/api/products", "/api/products/**").permitAll()
-                        // Public: register, login and demo checkout
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login",
                                 "/api/auth/verify-email", "/api/auth/forgot-password", "/api/auth/reset-password",
                                 "/api/orders").permitAll()
-                        // Admin only
                         .requestMatchers(HttpMethod.GET, "/api/orders/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // Everything else (e.g. GET /api/auth/me) needs a valid JWT
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
-    /** JwtAuthFilter is already part of the security chain; stop Spring Boot registering it a second time. */
     @Bean
     FilterRegistrationBean<JwtAuthFilter> jwtFilterRegistration(JwtAuthFilter filter) {
         FilterRegistrationBean<JwtAuthFilter> registration = new FilterRegistrationBean<>(filter);
@@ -71,15 +65,23 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    /** Which browser origins (the React app) may call this API. Configure with app.cors.allowed-origins. */
     @Bean
-    CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}") String[] origins) {
+    CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins:*}") String[] origins) {
         CorsConfiguration config = new CorsConfiguration();
+        
+        // Allowed origins
         config.setAllowedOrigins(Arrays.stream(origins).map(String::trim).toList());
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        
+        // Allowed HTTP methods
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        
+        // Allowed headers
+        config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
+        config.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", config);
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 
