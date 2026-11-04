@@ -1,97 +1,103 @@
 package com.shopeasy.mail;
 
-import com.shopeasy.mail.EmailTemplates.Rendered;
-import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-/**
- * Sends every mail ShopEasy produces.
- *
- * - SMTP configured (spring.mail.host set, e.g. SendGrid / Amazon SES / Gmail): the mail is really sent.
- * - Not configured (default for local development): nothing is sent, the mail - including its links - is printed to
- *   the backend console, so you can still click "verify" / "reset password" while developing.
- *
- * Every method runs in the background ("mailExecutor") and never throws: a mail problem must not break
- * checkout, registration or an admin status change.
- */
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 @Service
 public class EmailService {
+
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
+    private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
-    private final ObjectProvider<JavaMailSender> mailSender;
-    private final String from;
-    private final String frontendUrl;
+    @Value("${brevo.api.key}")
+    private String apiKey;
 
-    public EmailService(ObjectProvider<JavaMailSender> mailSender,
-                        @Value("${app.mail.from:ShopEasy <no-reply@shopeasy.local>}") String from,
-                        @Value("${app.frontend-url:http://localhost:5173}") String frontendUrl) {
-        this.mailSender = mailSender;
-        this.from = from;
-        this.frontendUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
-    }
+    @Value("${brevo.sender.email}")
+    private String senderEmail;
 
-    /* ---------------------------------------------------------------- account mails */
+    @Value("${brevo.sender.name:ShopEasy}")
+    private String senderName;
 
-    @Async("mailExecutor")
-    public void sendVerificationEmail(String name, String to, String rawToken) {
-        deliver(to, EmailTemplates.verifyEmail(name, frontendUrl + "/#/verify-email?token=" + rawToken));
-    }
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    @Async("mailExecutor")
-    public void sendPasswordResetEmail(String name, String to, String rawToken) {
-        deliver(to, EmailTemplates.resetPassword(name, frontendUrl + "/#/reset-password?token=" + rawToken));
-    }
-
-    /* ---------------------------------------------------------------- order mails */
-
-    @Async("mailExecutor")
-    public void sendOrderPlaced(OrderMailData order) {
-        deliver(order.email(), EmailTemplates.orderPlaced(order, frontendUrl + "/#/orders"));
-    }
-
-    @Async("mailExecutor")
-    public void sendOrderShipped(OrderMailData order) {
-        deliver(order.email(), EmailTemplates.orderShipped(order, frontendUrl + "/#/orders"));
-    }
-
-    @Async("mailExecutor")
-    public void sendOrderDelivered(OrderMailData order) {
-        deliver(order.email(), EmailTemplates.orderDelivered(order, frontendUrl + "/#/orders"));
-    }
-
-    @Async("mailExecutor")
-    public void sendOrderUpdate(OrderMailData order) {
-        deliver(order.email(), EmailTemplates.orderUpdate(order, frontendUrl + "/#/orders"));
-    }
-
-    /* ---------------------------------------------------------------- delivery */
-
-    private void deliver(String to, Rendered mail) {
-        try {
-            JavaMailSender sender = mailSender.getIfAvailable();
-            if (sender == null) {
-                log.info("\n------------- EMAIL (SMTP not configured - printed instead of sent) -------------\n"
-                        + "To:      {}\nSubject: {}\n\n{}\n---------------------------------------------------------------------------------",
-                        to, mail.subject(), mail.text());
-                return;
-            }
-            MimeMessage message = sender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(from);
-            helper.setTo(to);
-            helper.setSubject(mail.subject());
-            helper.setText(mail.text(), mail.html());
-            sender.send(message);
-            log.info("Email '{}' sent to {}", mail.subject(), to);
-        } catch (Exception e) {
-            log.error("Could not send email '{}' to {}: {}", mail.subject(), to, e.getMessage());
+    @Async
+    public void sendEmail(String toEmail, String subject, String htmlContent) {
+        if (apiKey == null || apiKey.trim().isEmpty() || senderEmail == null || senderEmail.trim().isEmpty()) {
+            log.error("Brevo API key or Sender Email is missing. Email not sent to: {}", toEmail);
+            return;
         }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("api-key", apiKey.trim());
+            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+
+            Map<String, Object> sender = new HashMap<>();
+            sender.put("name", senderName);
+            sender.put("email", senderEmail.trim());
+
+            Map<String, String> receiver = new HashMap<>();
+            receiver.put("email", toEmail.trim());
+
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("sender", sender);
+            requestBody.put("to", List.of(receiver));
+            requestBody.put("subject", subject);
+            requestBody.put("htmlContent", htmlContent);
+
+            HttpEntity> requestEntity = new HttpEntity<>(requestBody, headers);
+
+            log.info("Sending email via Brevo API to: {} with subject: {}", toEmail, subject);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    BREVO_API_URL,
+                    HttpMethod.POST,
+                    requestEntity,
+                    String.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("Email successfully sent to {}! Response: {}", toEmail, response.getBody());
+            } else {
+                log.error("Failed to send email to {}. Status: {}, Body: {}", toEmail, response.getStatusCode(), response.getBody());
+            }
+
+        } catch (Exception ex) {
+            log.error("Exception while sending email via Brevo API to {}: {}", toEmail, ex.getMessage(), ex);
+        }
+    }
+
+    public void sendVerificationEmail(String toEmail, String token, String appUrl) {
+        String link = appUrl + "/#verify-email?token=" + token;
+        String subject = "ShopEasy - Verify your email";
+        String html = EmailTemplates.verificationEmail(link);
+        sendEmail(toEmail, subject, html);
+    }
+
+    public void sendPasswordResetEmail(String toEmail, String token, String appUrl) {
+        String link = appUrl + "/#reset-password?token=" + token;
+        String subject = "ShopEasy - Password Reset Request";
+        String html = EmailTemplates.passwordResetEmail(link);
+        sendEmail(toEmail, subject, html);
+    }
+
+    public void sendOrderConfirmation(String toEmail, OrderMailData orderData) {
+        String subject = "ShopEasy - Order Confirmed #" + orderData.getOrderId();
+        String html = EmailTemplates.orderConfirmationEmail(orderData);
+        sendEmail(toEmail, subject, html);
     }
 }
