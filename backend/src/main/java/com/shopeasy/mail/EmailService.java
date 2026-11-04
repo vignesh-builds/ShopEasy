@@ -84,7 +84,7 @@ public class EmailService {
                     String.class
             );
 
-            log.info("Email sent successfully to {}. Brevo status code: {}", toEmail, response.getStatusCode());
+            log.info("Email sent successfully to {}. Brevo status: {}", toEmail, response.getStatusCode());
 
         } catch (HttpClientErrorException | HttpServerErrorException e) {
             log.error("Brevo API error for {}: {} - {}", toEmail, e.getStatusCode(), e.getResponseBodyAsString(), e);
@@ -103,11 +103,11 @@ public class EmailService {
         String htmlContent = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;\">"
                 + "<h2 style=\"color: #2563eb;\">ShopEasy</h2>"
                 + "<p>Hi <strong>" + (fullName != null ? fullName : "Customer") + "</strong>,</p>"
-                + "<p>We received a request to reset your password. Click the button below to set a new password:</p>"
+                + "<p>We received a request to reset your password. Click the button below:</p>"
                 + "<p style=\"text-align: center; margin: 30px 0;\">"
                 + "<a href=\"" + resetLink + "\" style=\"background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;\">Reset Password</a>"
                 + "</p>"
-                + "<p style=\"color: #64748b; font-size: 14px;\">This link will expire in 30 minutes. If you did not request this, please ignore this email.</p>"
+                + "<p style=\"color: #64748b; font-size: 14px;\">Valid for 30 minutes. If you did not make this request, you can ignore this email.</p>"
                 + "<hr style=\"border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;\" />"
                 + "<p style=\"color: #94a3b8; font-size: 12px;\">If the button doesn't work, copy and paste this link:<br/>"
                 + "<a href=\"" + resetLink + "\" style=\"color: #2563eb;\">" + resetLink + "</a></p>"
@@ -124,11 +124,11 @@ public class EmailService {
         String htmlContent = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;\">"
                 + "<h2 style=\"color: #2563eb;\">Welcome to ShopEasy!</h2>"
                 + "<p>Hi <strong>" + (fullName != null ? fullName : "Customer") + "</strong>,</p>"
-                + "<p>Thank you for signing up. Please verify your email address to activate all account features:</p>"
+                + "<p>Thank you for creating an account. Click the button below to verify your email address:</p>"
                 + "<p style=\"text-align: center; margin: 30px 0;\">"
                 + "<a href=\"" + verifyLink + "\" style=\"background-color: #16a34a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;\">Verify Email</a>"
                 + "</p>"
-                + "<p style=\"color: #64748b; font-size: 14px;\">This verification link is valid for 24 hours.</p>"
+                + "<p style=\"color: #64748b; font-size: 14px;\">Valid for 24 hours.</p>"
                 + "<hr style=\"border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;\" />"
                 + "<p style=\"color: #94a3b8; font-size: 12px;\">If the button doesn't work, copy and paste this link:<br/>"
                 + "<a href=\"" + verifyLink + "\" style=\"color: #16a34a;\">" + verifyLink + "</a></p>"
@@ -137,33 +137,33 @@ public class EmailService {
         sendEmail(fullName, toEmail, subject, htmlContent);
     }
 
-    /* ------------------------------------------------------------------ Order Emails (OrderMailListener) */
+    /* ------------------------------------------------------------------ Order Emails */
 
     @Async
     public void sendOrderPlaced(OrderMailData data) {
         String subject = "Order Confirmed - ShopEasy #" + data.orderId();
-        String htmlContent = EmailTemplates.orderPlaced(data);
-        sendEmail(data.customerName(), data.customerEmail(), subject, htmlContent);
+        String htmlContent = EmailTemplates.orderPlaced(data, frontendUrl);
+        sendEmail(data.customerName(), data.email(), subject, htmlContent);
     }
 
     @Async
     public void sendOrderShipped(OrderMailData data) {
         String subject = "Your Order Has Shipped! - ShopEasy #" + data.orderId();
-        String htmlContent = EmailTemplates.orderShipped(data);
-        sendEmail(data.customerName(), data.customerEmail(), subject, htmlContent);
+        String htmlContent = EmailTemplates.orderShipped(data, frontendUrl);
+        sendEmail(data.customerName(), data.email(), subject, htmlContent);
     }
 
     @Async
     public void sendOrderDelivered(OrderMailData data) {
         String subject = "Order Delivered - ShopEasy #" + data.orderId();
-        String htmlContent = EmailTemplates.orderDelivered(data);
-        sendEmail(data.customerName(), data.customerEmail(), subject, htmlContent);
+        String htmlContent = EmailTemplates.orderDelivered(data, frontendUrl);
+        sendEmail(data.customerName(), data.email(), subject, htmlContent);
     }
 
     @Async
     public void sendOrderUpdate(OrderMailData data) {
         String subject = "Order Update - ShopEasy #" + data.orderId();
-        String htmlContent = EmailTemplates.orderUpdate(data);
-        sendEmail(data.customerName(), data.customerEmail(), subject, htmlContent);
+        String htmlContent = EmailTemplates.orderUpdate(data, frontendUrl);
+        sendEmail(data.customerName(), data.email(), subject, htmlContent);
     }
 }
