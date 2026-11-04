@@ -12,6 +12,8 @@ import com.shopeasy.mail.EmailService;
 import com.shopeasy.repository.AppUserRepository;
 import com.shopeasy.repository.EmailTokenRepository;
 import com.shopeasy.security.JwtService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,8 @@ import java.util.HexFormat;
 
 @Service
 public class AuthService {
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     static final Duration VERIFY_TTL = Duration.ofHours(24);
     static final Duration RESET_TTL = Duration.ofMinutes(30);
     /** Minimum gap between two mails of the same kind to the same account (stops mail flooding). */
@@ -54,7 +58,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        String email = request.email().trim();
+        String email = request.email() == null ? "" : request.email().trim();
         if (users.existsByEmailIgnoreCase(email)) {
             throw ApiException.conflict("Email is already registered");
         }
@@ -66,7 +70,8 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        AppUser user = users.findByEmailIgnoreCase(request.email().trim()).orElse(null);
+        String email = request.email() == null ? "" : request.email().trim();
+        AppUser user = users.findByEmailIgnoreCase(email).orElse(null);
         if (user == null || !encoder.matches(request.password(), user.getPasswordHash())) {
             throw ApiException.unauthorized("Invalid email or password");
         }
@@ -85,7 +90,7 @@ public class AuthService {
     /** Logged-in user asks for a fresh verification mail. */
     @Transactional
     public MessageResponse resendVerification(String email) {
-        AppUser user = users.findByEmailIgnoreCase(email == null ? "" : email)
+        AppUser user = users.findByEmailIgnoreCase(email == null ? "" : email.trim())
                 .orElseThrow(() -> ApiException.unauthorized("Authentication required"));
         if (user.isEmailVerified()) {
             return new MessageResponse("Your email is already verified.");
@@ -124,13 +129,32 @@ public class AuthService {
     /** Always answers the same way, so nobody can use this to find out which emails are registered. */
     @Transactional
     public MessageResponse forgotPassword(String email) {
-        tokens.deleteExpiredBefore(Instant.now().minus(Duration.ofDays(7)));
-        AppUser user = users.findByEmailIgnoreCase(email.trim()).orElse(null);
-        if (user != null && !inCooldown(user.getId(), EmailToken.RESET_PASSWORD)) {
-            String raw = newRawToken();
-            tokens.save(new EmailToken(user.getId(), hash(raw), EmailToken.RESET_PASSWORD, Instant.now().plus(RESET_TTL)));
-            emails.sendPasswordResetEmail(user.getFullName(), user.getEmail(), raw);
+        String cleanEmail = email == null ? "" : email.trim();
+        log.info("Processing forgot-password request for email: '{}'", cleanEmail);
+
+        try {
+            tokens.deleteExpiredBefore(Instant.now().minus(Duration.ofDays(7)));
+        } catch (Exception e) {
+            log.warn("Failed to cleanup expired tokens: {}", e.getMessage());
         }
+
+        AppUser user = users.findByEmailIgnoreCase(cleanEmail).orElse(null);
+        if (user == null) {
+            log.warn("Forgot password requested for non-existent email: '{}'", cleanEmail);
+            return new MessageResponse(FORGOT_MESSAGE);
+        }
+
+        if (inCooldown(user.getId(), EmailToken.RESET_PASSWORD)) {
+            log.warn("Forgot password request ignored due to cooldown for user id: {}", user.getId());
+            return new MessageResponse(FORGOT_MESSAGE);
+        }
+
+        String raw = newRawToken();
+        tokens.save(new EmailToken(user.getId(), hash(raw), EmailToken.RESET_PASSWORD, Instant.now().plus(RESET_TTL)));
+        
+        log.info("Triggering password reset email to: {}", user.getEmail());
+        emails.sendPasswordResetEmail(user.getFullName(), user.getEmail(), raw);
+
         return new MessageResponse(FORGOT_MESSAGE);
     }
 
@@ -144,7 +168,7 @@ public class AuthService {
         AppUser user = users.findById(token.getUserId()).orElseThrow(() -> ApiException.badRequest(INVALID_LINK));
 
         user.setPasswordHash(encoder.encode(newPassword));
-        user.setEmailVerified(true);            // they just proved they own this mailbox
+        user.setEmailVerified(true); // they just proved they own this mailbox
         users.save(user);
 
         Instant now = Instant.now();
@@ -158,7 +182,6 @@ public class AuthService {
     /* ------------------------------------------------------------------ helpers */
 
     private void sendVerification(AppUser user) {
-        // a new link replaces older ones
         Instant now = Instant.now();
         tokens.findByUserIdAndTypeAndUsedAtIsNull(user.getId(), EmailToken.VERIFY_EMAIL).forEach(t -> t.setUsedAt(now));
         String raw = newRawToken();
