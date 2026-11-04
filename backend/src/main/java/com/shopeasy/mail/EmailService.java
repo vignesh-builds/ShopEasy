@@ -32,6 +32,9 @@ public class EmailService {
     @Value("${brevo.sender.name:ShopEasy}")
     private String senderName;
 
+    @Value("${app.frontend.url:https://shopeasy-frontend-wvvl.onrender.com}")
+    private String frontendUrl;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Async
@@ -84,46 +87,46 @@ public class EmailService {
     // --- Verification & Password Reset ---
 
     public void sendVerificationEmail(String toEmail, String token, String appUrl) {
-        String link = appUrl + "/#verify-email?token=" + token;
-        String subject = "ShopEasy - Verify your email";
-        String html = EmailTemplates.verifyEmail(link);
-        sendEmail(toEmail, subject, html);
+        String base = (appUrl != null && !appUrl.isBlank()) ? appUrl : frontendUrl;
+        String link = base + "/#verify-email?token=" + token;
+        EmailTemplates.Rendered rendered = EmailTemplates.verifyEmail(toEmail, link);
+        sendEmail(toEmail, rendered.subject(), rendered.html());
     }
 
     public void sendPasswordResetEmail(String toEmail, String token, String appUrl) {
-        String link = appUrl + "/#reset-password?token=" + token;
-        String subject = "ShopEasy - Password Reset Request";
-        String html = EmailTemplates.resetPassword(link);
-        sendEmail(toEmail, subject, html);
+        String base = (appUrl != null && !appUrl.isBlank()) ? appUrl : frontendUrl;
+        String link = base + "/#reset-password?token=" + token;
+        EmailTemplates.Rendered rendered = EmailTemplates.resetPassword(toEmail, link);
+        sendEmail(toEmail, rendered.subject(), rendered.html());
     }
 
-    // --- Order Notification Methods (Called by OrderMailListener) ---
+    // --- Order Notifications (OrderMailListener-ல் இருந்து அழைக்கப்படுபவை) ---
 
     public void sendOrderPlaced(OrderMailData data) {
-        if (data == null || data.customerEmail() == null) return;
-        String subject = "ShopEasy - Order Confirmed #" + data.orderNumber();
-        String html = EmailTemplates.orderPlaced(data);
-        sendEmail(data.customerEmail(), subject, html);
+        if (data == null || data.email() == null) return;
+        String ordersLink = frontendUrl + "/#orders";
+        EmailTemplates.Rendered rendered = EmailTemplates.orderPlaced(data, ordersLink);
+        sendEmail(data.email(), rendered.subject(), rendered.html());
     }
 
     public void sendOrderShipped(OrderMailData data) {
-        if (data == null || data.customerEmail() == null) return;
-        String subject = "ShopEasy - Order Shipped #" + data.orderNumber();
-        String html = EmailTemplates.orderShipped(data);
-        sendEmail(data.customerEmail(), subject, html);
+        if (data == null || data.email() == null) return;
+        String ordersLink = frontendUrl + "/#orders";
+        EmailTemplates.Rendered rendered = EmailTemplates.orderShipped(data, ordersLink);
+        sendEmail(data.email(), rendered.subject(), rendered.html());
     }
 
     public void sendOrderDelivered(OrderMailData data) {
-        if (data == null || data.customerEmail() == null) return;
-        String subject = "ShopEasy - Order Delivered #" + data.orderNumber();
-        String html = EmailTemplates.orderDelivered(data);
-        sendEmail(data.customerEmail(), subject, html);
+        if (data == null || data.email() == null) return;
+        String ordersLink = frontendUrl + "/#orders";
+        EmailTemplates.Rendered rendered = EmailTemplates.orderDelivered(data, ordersLink);
+        sendEmail(data.email(), rendered.subject(), rendered.html());
     }
 
     public void sendOrderUpdate(OrderMailData data) {
-        if (data == null || data.customerEmail() == null) return;
-        String subject = "ShopEasy - Order Status Update #" + data.orderNumber();
-        String html = EmailTemplates.orderUpdated(data);
-        sendEmail(data.customerEmail(), subject, html);
+        if (data == null || data.email() == null) return;
+        String ordersLink = frontendUrl + "/#orders";
+        EmailTemplates.Rendered rendered = EmailTemplates.orderUpdate(data, ordersLink);
+        sendEmail(data.email(), rendered.subject(), rendered.html());
     }
 }
