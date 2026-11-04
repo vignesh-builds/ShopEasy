@@ -81,23 +81,49 @@ public class EmailService {
         }
     }
 
+    // --- Verification & Password Reset ---
+
     public void sendVerificationEmail(String toEmail, String token, String appUrl) {
         String link = appUrl + "/#verify-email?token=" + token;
         String subject = "ShopEasy - Verify your email";
-        String html = EmailTemplates.verificationEmail(link);
+        String html = EmailTemplates.verifyEmail(link);
         sendEmail(toEmail, subject, html);
     }
 
     public void sendPasswordResetEmail(String toEmail, String token, String appUrl) {
         String link = appUrl + "/#reset-password?token=" + token;
         String subject = "ShopEasy - Password Reset Request";
-        String html = EmailTemplates.passwordResetEmail(link);
+        String html = EmailTemplates.resetPassword(link);
         sendEmail(toEmail, subject, html);
     }
 
-    public void sendOrderConfirmation(String toEmail, OrderMailData orderData) {
-        String subject = "ShopEasy - Order Confirmed #" + orderData.getOrderId();
-        String html = EmailTemplates.orderConfirmationEmail(orderData);
-        sendEmail(toEmail, subject, html);
+    // --- Order Notification Methods (Called by OrderMailListener) ---
+
+    public void sendOrderPlaced(OrderMailData data) {
+        if (data == null || data.customerEmail() == null) return;
+        String subject = "ShopEasy - Order Confirmed #" + data.orderNumber();
+        String html = EmailTemplates.orderPlaced(data);
+        sendEmail(data.customerEmail(), subject, html);
+    }
+
+    public void sendOrderShipped(OrderMailData data) {
+        if (data == null || data.customerEmail() == null) return;
+        String subject = "ShopEasy - Order Shipped #" + data.orderNumber();
+        String html = EmailTemplates.orderShipped(data);
+        sendEmail(data.customerEmail(), subject, html);
+    }
+
+    public void sendOrderDelivered(OrderMailData data) {
+        if (data == null || data.customerEmail() == null) return;
+        String subject = "ShopEasy - Order Delivered #" + data.orderNumber();
+        String html = EmailTemplates.orderDelivered(data);
+        sendEmail(data.customerEmail(), subject, html);
+    }
+
+    public void sendOrderUpdate(OrderMailData data) {
+        if (data == null || data.customerEmail() == null) return;
+        String subject = "ShopEasy - Order Status Update #" + data.orderNumber();
+        String html = EmailTemplates.orderUpdated(data);
+        sendEmail(data.customerEmail(), subject, html);
     }
 }
