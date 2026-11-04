@@ -63,7 +63,7 @@ public class EmailService {
             requestBody.put("subject", subject);
             requestBody.put("htmlContent", htmlContent);
 
-            HttpEntity> requestEntity = new HttpEntity<>(requestBody, headers);
+            var requestEntity = new HttpEntity<>(requestBody, headers);
 
             log.info("Sending email via Brevo API to: {} with subject: {}", toEmail, subject);
             ResponseEntity<String> response = restTemplate.exchange(
@@ -100,7 +100,7 @@ public class EmailService {
         sendEmail(toEmail, rendered.subject(), rendered.html());
     }
 
-    // --- Order Notifications (OrderMailListener-ல் இருந்து அழைக்கப்படுபவை) ---
+    // --- Order Notification Methods ---
 
     public void sendOrderPlaced(OrderMailData data) {
         if (data == null || data.email() == null) return;
