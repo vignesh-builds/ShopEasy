@@ -47,7 +47,7 @@ public class EmailService {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("api-key", apiKey.trim());
+            headers.set("api-key", apiKey != null ? apiKey.trim() : "");
             headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
 
             Map<String, Object> sender = new HashMap<>();
