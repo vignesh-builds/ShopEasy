@@ -37,7 +37,9 @@ public class AuthService {
     static final Duration COOLDOWN = Duration.ofSeconds(60);
 
     static final String INVALID_LINK = "This link is invalid or has expired. Please request a new one.";
-    static final String FORGOT_MESSAGE = "If an account exists for that email, we have sent a password reset link.";
+    static final String FORGOT_MESSAGE = "Account found. We have sent a password reset link to your email.";
+    static final String NO_ACCOUNT_MESSAGE = "No account exists with this email. Please check the email or sign up.";
+    static final String FORGOT_COOLDOWN_MESSAGE = "A reset link was sent just now. Please wait a minute and check your inbox or spam folder.";
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -126,7 +128,7 @@ public class AuthService {
 
     /* ------------------------------------------------------------------ forgot / reset password */
 
-    /** Always answers the same way, so nobody can use this to find out which emails are registered. */
+    /** Tells the user clearly whether an account exists for the email (404 if not). */
     @Transactional
     public MessageResponse forgotPassword(String email) {
         String cleanEmail = email == null ? "" : email.trim();
@@ -141,17 +143,17 @@ public class AuthService {
         AppUser user = users.findByEmailIgnoreCase(cleanEmail).orElse(null);
         if (user == null) {
             log.warn("Forgot password requested for non-existent email: '{}'", cleanEmail);
-            return new MessageResponse(FORGOT_MESSAGE);
+            throw ApiException.notFound(NO_ACCOUNT_MESSAGE);
         }
 
         if (inCooldown(user.getId(), EmailToken.RESET_PASSWORD)) {
             log.warn("Forgot password request ignored due to cooldown for user id: {}", user.getId());
-            return new MessageResponse(FORGOT_MESSAGE);
+            return new MessageResponse(FORGOT_COOLDOWN_MESSAGE);
         }
 
         String raw = newRawToken();
         tokens.save(new EmailToken(user.getId(), hash(raw), EmailToken.RESET_PASSWORD, Instant.now().plus(RESET_TTL)));
-        
+
         log.info("Triggering password reset email to: {}", user.getEmail());
         emails.sendPasswordResetEmail(user.getFullName(), user.getEmail(), raw);
 
