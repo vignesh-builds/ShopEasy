@@ -109,9 +109,6 @@ public class EmailService {
                 + "<a href=\"" + resetLink + "\" style=\"background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;\">Reset Password</a>"
                 + "</p>"
                 + "<p style=\"color: #64748b; font-size: 14px;\">This link will expire in 30 minutes. If you did not request this, please ignore this email.</p>"
-                + "<hr style=\"border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;\" />"
-                + "<p style=\"color: #94a3b8; font-size: 12px;\">If the button doesn't work, copy and paste this link:<br/>"
-                + "<a href=\"" + resetLink + "\" style=\"color: #2563eb;\">" + resetLink + "</a></p>"
                 + "</div>";
 
         sendEmail(fullName, toEmail, subject, htmlContent);
@@ -130,9 +127,6 @@ public class EmailService {
                 + "<a href=\"" + verifyLink + "\" style=\"background-color: #16a34a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;\">Verify Email</a>"
                 + "</p>"
                 + "<p style=\"color: #64748b; font-size: 14px;\">This verification link is valid for 24 hours.</p>"
-                + "<hr style=\"border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;\" />"
-                + "<p style=\"color: #94a3b8; font-size: 12px;\">If the button doesn't work, copy and paste this link:<br/>"
-                + "<a href=\"" + verifyLink + "\" style=\"color: #16a34a;\">" + verifyLink + "</a></p>"
                 + "</div>";
 
         sendEmail(fullName, toEmail, subject, htmlContent);
