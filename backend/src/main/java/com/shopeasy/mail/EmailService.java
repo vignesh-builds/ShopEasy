@@ -97,7 +97,8 @@ public class EmailService {
 
     @Async
     public void sendPasswordResetEmail(String fullName, String toEmail, String rawToken) {
-        String resetLink = frontendUrl + "/reset-password?token=" + rawToken;
+        // Frontend hash router use pannuthu, so link-la "/#/" venum
+        String resetLink = frontendUrl + "/#/reset-password?token=" + rawToken;
         String subject = "Reset your ShopEasy password";
 
         String htmlContent = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;\">"
@@ -118,7 +119,7 @@ public class EmailService {
 
     @Async
     public void sendVerificationEmail(String fullName, String toEmail, String rawToken) {
-        String verifyLink = frontendUrl + "/verify-email?token=" + rawToken;
+        String verifyLink = frontendUrl + "/#/verify-email?token=" + rawToken;
         String subject = "Verify your ShopEasy account";
 
         String htmlContent = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;\">"
