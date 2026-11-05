@@ -136,11 +136,11 @@ class EmailAndRecommendationTests {
     }
 
     @Test
-    void forgotPasswordDoesNotRevealWhichEmailsExist() throws Exception {
+    void forgotPasswordTellsWhenNoAccountExists() throws Exception {
         mvc.perform(post("/api/auth/forgot-password").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"nobody" + System.nanoTime() + "@example.com\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").isNotEmpty());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").isNotEmpty());
         verify(emailService, times(0)).sendPasswordResetEmail(anyString(), anyString(), anyString());
 
         mvc.perform(post("/api/auth/forgot-password").contentType(MediaType.APPLICATION_JSON)
